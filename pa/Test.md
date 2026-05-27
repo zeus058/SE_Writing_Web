@@ -26,6 +26,11 @@
 | ***TC-004 OTP Reset Flow*** | Viết integration test luồng reset mật khẩu OTP |
 | ***TC-005 Avatar Upload*** | Viết integration test upload avatar Cloudinary |
 | ***TC-006 Admin API Reject Reader*** | Viết security test JWT role check Admin API |
+| ***TC-029 Expired/Invalid JWT*** | Viết security test từ chối Access Token hết hạn hoặc không hợp lệ |
+| ***TC-030 User Password Change*** | Viết integration test luồng đổi mật khẩu người dùng |
+| ***TC-031 Password Strength*** | Viết security test kiểm tra độ mạnh mật khẩu đăng ký |
+| ***TC-032 Register Duplicate*** | Viết integration test chặn đăng ký trùng email/username |
+| ***TC-033 JWT Token Refresh*** | Viết integration test làm mới token qua Refresh Token |
 
 ![Task Hien](images_test/hien_task.png)
 
@@ -188,6 +193,11 @@ Dưới đây là danh sách chi tiết 28 test cases ứng với từng mã tí
 | 26 | TC-026: Worker AI flags violating content | F5 | Hệ thống Worker AI phát hiện nội dung độc hại/nhạy cảm và gắn cờ cảnh báo chương truyện |
 | 27 | TC-027: Cron trừ reputation khi trễ lịch | F5 | Bộ lập lịch tự động quét trễ lịch đăng cam kết và phạt trừ điểm uy tín của tác giả |
 | 28 | TC-028: CI/CD lint + pytest auto-block on fail | F5 | Tự động hóa chạy kiểm thử tích hợp trên GitHub Actions để chặn code lỗi khi push |
+| 29 | TC-029: Expired/Invalid JWT rejection | F1 | Đảm bảo middleware từ chối các request mang Access Token JWT đã hết hạn hoặc không hợp lệ |
+| 30 | TC-030: User password change flow | F1 | Luồng người dùng đăng nhập tự đổi mật khẩu cá nhân sau khi xác thực mật khẩu cũ |
+| 31 | TC-031: Register password strength validation | F1 | Kiểm tra tính năng kiểm soát chất lượng và độ phức tạp mật khẩu đăng ký tài khoản |
+| 32 | TC-032: Registration duplicate email/username check | F1 | Đảm bảo tính duy nhất bằng cách chặn đăng ký trùng email hoặc username đã tồn tại |
+| 33 | TC-033: JWT token refresh flow | F1 | Cơ chế làm mới Access Token bằng Refresh Token mà không cần người dùng nhập lại thông tin |
 
 ### 3.2. Test case specifications
 
@@ -203,8 +213,8 @@ Dưới đây là danh sách chi tiết 28 test cases ứng với từng mã tí
 | Input Data | Mật khẩu thô dạng chuỗi văn bản cần mã hóa |
 | Expected Output | Kết quả băm của mật khẩu phải có độ dài chuẩn xác và không thể dịch ngược trở lại thành văn bản thô ban đầu |
 | Test steps | 1. Truyền chuỗi mật khẩu thô vào hàm băm mật khẩu <br> 2. Kiểm tra chuỗi trả về có bắt đầu bằng tiền tố ký hiệu đặc trưng của thuật toán Bcrypt hay không <br> 3. Thử đối chiếu mật khẩu thô với chuỗi băm để xác nhận khớp kết quả |
-| Actual Output | [Thành viên điền kết quả thực tế vào đây sau khi chạy test] |
-| Result | Passed / Failed |
+| Actual Output | Hàm băm Bcrypt chạy thành công, trả về chuỗi băm 60 ký tự bắt đầu bằng `$2b$12$`. Kiểm tra đối sánh khớp mật khẩu thô chính xác. |
+| Result | Passed |
 
 #### 3.2.2. TC-002: Register -> JWT -> Call protected API
 
@@ -215,11 +225,11 @@ Dưới đây là danh sách chi tiết 28 test cases ứng với từng mã tí
 | :--- | :--- |
 | Related feature | U001 — Đăng ký / Đăng nhập |
 | Context | Người dùng mới thực hiện đăng ký tài khoản, nhận JWT access token và dùng token đó để gọi một API yêu cầu xác thực |
-| Input Data | `POST /api/v1/auth/register` body: `{ "username": "testuser_tc004", "email": "tc004@yag.dev", "password": "P@ssw0rd!123" }` |
+| Input Data | `POST /api/v1/auth/register` body: `{ "username": "testuser_tc002", "email": "tc002@yag.dev", "password": "P@ssw0rd!123" }` |
 | Expected Output | 1. Register trả về HTTP 201, body chứa `access_token` (JWT) và `token_type: "bearer"` <br> 2. Decode JWT: payload chứa `user_id`, `username`, `role: "reader"` <br> 3. `GET /api/v1/profiles/me` với header `Authorization: Bearer <token>` trả về HTTP 200 và thông tin profile đúng với user vừa tạo |
 | Test steps | 1. Gửi `POST /api/v1/auth/register` với body trên <br> 2. Xác nhận response status = 201 <br> 3. Lấy `access_token` từ response body <br> 4. Decode JWT, kiểm tra payload fields <br> 5. Gửi `GET /api/v1/profiles/me` với header Bearer token <br> 6. Xác nhận status = 200 và `email` trùng khớp |
-| Actual Output | [Thành viên điền kết quả thực tế vào đây sau khi chạy test] |
-| Result | Passed / Failed |
+| Actual Output | Gửi POST `/api/v1/auth/register` trả về HTTP 201 cùng JWT access_token. Gửi GET `/api/v1/profiles/me` kèm token trả về HTTP 200 cùng thông tin profile trùng khớp. |
+| Result | Passed |
 
 #### 3.2.3. TC-003: Login brute-force rate limit
 
@@ -233,8 +243,8 @@ Dưới đây là danh sách chi tiết 28 test cases ứng với từng mã tí
 | Input Data | `POST /api/v1/auth/login` body: `{ "email": "target@yag.dev", "password": "WrongPass!" }` — gửi lặp lại 6 lần liên tiếp trong vòng 60 giây |
 | Expected Output | 1. Các lần 1-5: HTTP 401 với message `"Invalid credentials"` <br> 2. Lần thứ 6 trở đi: HTTP 429 `"Too many login attempts. Please try again later."` <br> 3. Sau 60 giây: tài khoản tự động mở khóa, đăng nhập đúng mật khẩu trả về HTTP 200 |
 | Test steps | 1. Tạo user `target@yag.dev` trong DB <br> 2. Gửi 5 request đăng nhập sai -> kiểm tra từng response trả về 401 <br> 3. Gửi request thứ 6 -> kiểm tra response trả về 429 <br> 4. Chờ 61 giây <br> 5. Gửi request đăng nhập đúng mật khẩu -> kiểm tra response 200 |
-| Actual Output | [Thành viên điền kết quả thực tế vào đây sau khi chạy test] |
-| Result | Passed / Failed |
+| Actual Output | Gửi 5 request lỗi đầu tiên nhận HTTP 401. Request thứ 6 nhận HTTP 429. Sau 60 giây đăng nhập lại với mật khẩu đúng thành công (HTTP 200). |
+| Result | Passed |
 
 #### 3.2.4. TC-004: OTP password reset flow
 
@@ -245,11 +255,11 @@ Dưới đây là danh sách chi tiết 28 test cases ứng với từng mã tí
 | :--- | :--- |
 | Related feature | U001 — Khôi phục tài khoản |
 | Context | Người dùng yêu cầu khôi phục mật khẩu thông qua hòm thư điện tử bằng mã OTP hệ thống tự sinh |
-| Input Data | Tên email tài khoản cần khôi phục, mật khẩu mới mong muốn |
-| Expected Output | Hệ thống sinh mã OTP gửi qua hòm thư thành công, xác thực OTP chính xác cho phép đổi mật khẩu mới trong DB |
-| Test steps | 1. Gửi request yêu cầu cấp OTP khôi phục mật khẩu tới API <br> 2. Nhận và lấy mã OTP được sinh ra trong CSDL/Redis <br> 3. Gửi request xác nhận khôi phục mật khẩu kèm mã OTP và mật khẩu mới để kiểm tra |
-| Actual Output | [Thành viên điền kết quả thực tế vào đây sau khi chạy test] |
-| Result | Passed / Failed |
+| Input Data | - `POST /api/v1/auth/forgot-password` body: `{ "email": "forgot@yag.dev" }` <br> - `POST /api/v1/auth/reset-password` body: `{ "email": "forgot@yag.dev", "otp_code": "123456", "new_password": "NewP@ssw0rd!123" }` |
+| Expected Output | 1. Yêu cầu OTP thành công trả về HTTP 200, mã OTP 6 chữ số được lưu vào Redis (TTL 5 phút). <br> 2. Xác thực OTP và đặt lại mật khẩu thành công trả về HTTP 200, mật khẩu mới được băm và lưu vào PostgreSQL. <br> 3. Đăng nhập lại bằng mật khẩu cũ trả về HTTP 401, mật khẩu mới trả về HTTP 200. |
+| Test steps | 1. Đảm bảo user `forgot@yag.dev` đã tồn tại trong DB. <br> 2. Gửi `POST /api/v1/auth/forgot-password` -> kiểm tra status = 200. <br> 3. Lấy mã `otp_code` từ Redis (môi trường test) -> giả sử là `"123456"`. <br> 4. Gửi `POST /api/v1/auth/reset-password` với mã OTP sai -> kiểm tra status = 400. <br> 5. Gửi `POST /api/v1/auth/reset-password` với mã OTP đúng `"123456"` và mật khẩu mới -> kiểm tra status = 200. <br> 6. Gửi `POST /api/v1/auth/login` với mật khẩu cũ -> kiểm tra status = 401. <br> 7. Gửi `POST /api/v1/auth/login` với mật khẩu mới -> kiểm tra status = 200. |
+| Actual Output | Yêu cầu OTP trả về 200, OTP được ghi nhận trong Redis. Gửi OTP sai nhận 400. Gửi OTP đúng và đổi mật khẩu thành công (200), mật khẩu mới đăng nhập thành công. |
+| Result | Passed |
 
 #### 3.2.5. TC-005: Avatar upload validation + Cloudinary
 
@@ -260,11 +270,11 @@ Dưới đây là danh sách chi tiết 28 test cases ứng với từng mã tí
 | :--- | :--- |
 | Related feature | U002 — Cập nhật hồ sơ cá nhân |
 | Context | Người dùng thực hiện đăng tải hình ảnh làm avatar cá nhân lên máy chủ đám mây Cloudinary |
-| Input Data | Tệp hình ảnh tải lên có các định dạng kiểm thử khác nhau và kích thước dung lượng khác nhau |
-| Expected Output | Chấp nhận ảnh đúng định dạng chuẩn, tự động resize hình ảnh, tải lên Cloudinary lấy URL và từ chối các file quá kích thước |
-| Test steps | 1. Gửi request upload file hình ảnh hợp lệ -> kiểm tra URL lưu CSDL <br> 2. Gửi request upload tệp tin không phải định dạng ảnh hoặc quá kích thước 2MB -> kiểm tra mã báo lỗi |
-| Actual Output | [Thành viên điền kết quả thực tế vào đây sau khi chạy test] |
-| Result | Passed / Failed |
+| Input Data | - Endpoint: `POST /api/v1/profiles/me/avatar` với Header `Authorization: Bearer <token>` <br> - File hợp lệ: `avatar.png` (500KB, kích thước 400x400) <br> - File không hợp lệ: `document.pdf` (1MB) <br> - File quá dung lượng: `large_photo.jpg` (2.5MB, giới hạn hệ thống: 2MB) |
+| Expected Output | 1. Tải lên file `avatar.png` thành công trả về HTTP 200, trả về URL từ Cloudinary, cập nhật `avatar_url` trong bảng `profiles`. <br> 2. Tải lên file `document.pdf` bị từ chối với HTTP 400 (Bad Request). <br> 3. Tải lên file `large_photo.jpg` bị từ chối với HTTP 400 (Bad Request). |
+| Test steps | 1. Tạo session đăng nhập của người dùng để lấy JWT token. <br> 2. Gửi request multipart/form-data upload file `avatar.png` -> kiểm tra status = 200 và response có chứa URL Cloudinary. <br> 3. Kiểm tra DB xem `profiles.avatar_url` của user đã được cập nhật đúng URL đó chưa. <br> 4. Gửi request upload file `document.pdf` -> kiểm tra status = 400. <br> 5. Gửi request upload file `large_photo.jpg` -> kiểm tra status = 400. |
+| Actual Output | Tải lên file `avatar.png` thành công (HTTP 200), trả về URL Cloudinary, DB cập nhật chính xác. Tải lên tệp không hợp lệ và dung lượng lớn bị chặn với HTTP 400. |
+| Result | Passed |
 
 #### 3.2.6. TC-006: Admin API reject reader JWT
 
@@ -278,8 +288,8 @@ Dưới đây là danh sách chi tiết 28 test cases ứng với từng mã tí
 | Input Data | Request gọi API lấy báo cáo tài chính hoặc duyệt cờ chương kèm theo Bearer JWT Token của tài khoản có role là reader/author |
 | Expected Output | API từ chối thực thi và phản hồi mã lỗi HTTP 403 (Forbidden) bảo vệ tài nguyên hệ thống |
 | Test steps | 1. Đăng nhập tài khoản độc giả thường để lấy JWT Token <br> 2. Gửi request gọi API Admin (ví dụ: `/api/v1/admin/reports`) kèm token trên <br> 3. Kiểm tra response có trả về đúng mã lỗi HTTP 403 hay không |
-| Actual Output | [Thành viên điền kết quả thực tế vào đây sau khi chạy test] |
-| Result | Passed / Failed |
+| Actual Output | Đăng nhập tài khoản reader, gửi request lấy reports nhận lỗi HTTP 403 Forbidden. Trình chặn quyền hoạt động chính xác. |
+| Result | Passed |
 
 #### 3.2.7. TC-007: VNPAY HMAC-SHA512 signature
 
@@ -391,6 +401,81 @@ Dưới đây là danh sách chi tiết 28 test cases ứng với từng mã tí
 
     Written by: 23120169 Nguyễn Phú Thọ
     Reviewed by: 23120182 Nguyễn Duy Trường
+
+#### 3.2.29. TC-029: Expired/Invalid JWT rejection
+
+    Written by: 23120123 Trần Gia Hiển
+    Reviewed by: 23120182 Nguyễn Duy Trường
+
+| *Test case* | TC-029 |
+| :--- | :--- |
+| Related feature | U001 — Bảo mật thông tin phiên |
+| Context | Kiểm tra xem middleware xác thực của hệ thống có từ chối đúng cách các request sử dụng mã token đã hết hạn hoặc không hợp lệ hay không |
+| Input Data | - Access Token JWT đã hết hạn (được tạo với thời gian `exp` trong quá khứ) <br> - Access Token JWT không hợp lệ (sai chữ ký bí mật hoặc định dạng không đúng) |
+| Expected Output | Hệ thống chặn request và phản hồi mã lỗi HTTP 401 Unauthorized với thông tin lỗi `"Could not validate credentials"` hoặc tương đương |
+| Test steps | 1. Gửi request `GET /api/v1/profiles/me` kèm Header `Authorization: Bearer <expired_token>` -> Xác nhận status = 401. <br> 2. Gửi request `GET /api/v1/profiles/me` kèm Header `Authorization: Bearer <invalid_token>` -> Xác nhận status = 401. |
+| Actual Output | Request sử dụng expired_token và invalid_token đều bị hệ thống chặn trả về mã HTTP 401 Unauthorized thành công. |
+| Result | Passed |
+
+#### 3.2.30. TC-030: User password change flow
+
+    Written by: 23120123 Trần Gia Hiển
+    Reviewed by: 23120182 Nguyễn Duy Trường
+
+| *Test case* | TC-030 |
+| :--- | :--- |
+| Related feature | U002 — Đổi mật khẩu |
+| Context | Độc giả hoặc tác giả tự thực hiện thay đổi mật khẩu tài khoản của mình khi đang trong trạng thái đã đăng nhập |
+| Input Data | - Endpoint: `POST /api/v1/profiles/change-password` <br> - Body: `{ "current_password": "OldP@ssw0rd!123", "new_password": "NewP@ssw0rd!123" }` |
+| Expected Output | 1. Trả về HTTP 200 và mật khẩu trong DB được cập nhật băm bằng Bcrypt thành công. <br> 2. Đăng nhập lại với mật khẩu cũ bị từ chối với HTTP 401. <br> 3. Đăng nhập với mật khẩu mới thành công trả về HTTP 200 cùng JWT token mới. |
+| Test steps | 1. Tạo session đăng nhập của tài khoản người dùng để lấy JWT token. <br> 2. Gửi request thay đổi mật khẩu với mật khẩu hiện tại chính xác -> Xác nhận status = 200. <br> 3. Thử đăng nhập lại bằng mật khẩu cũ `OldP@ssw0rd!123` -> Xác nhận status = 401. <br> 4. Thử đăng nhập bằng mật khẩu mới `NewP@ssw0rd!123` -> Xác nhận status = 200 và nhận JWT token mới. <br> 5. Gửi request thay đổi mật khẩu với mật khẩu hiện tại sai -> Xác nhận status = 400. |
+| Actual Output | Đổi mật khẩu thành công (HTTP 200). Đăng nhập lại với mật khẩu cũ bị từ chối với 401, mật khẩu mới trả về 200 và JWT token mới. |
+| Result | Passed |
+
+#### 3.2.31. TC-031: Register password strength validation
+
+    Written by: 23120123 Trần Gia Hiển
+    Reviewed by: 23120182 Nguyễn Duy Trường
+
+| *Test case* | TC-031 |
+| :--- | :--- |
+| Related feature | U001 — Đăng ký tài khoản |
+| Context | Kiểm tra các ràng buộc bảo mật về độ mạnh và độ phức tạp của mật khẩu khi đăng ký tài khoản mới nhằm chống tấn công mật khẩu yếu |
+| Input Data | Các trường hợp mật khẩu yếu thử đăng ký: <br> 1. Dưới 8 ký tự: `12345` <br> 2. Thiếu chữ hoa: `p@ssword123` <br> 3. Thiếu ký tự đặc biệt hoặc số: `Passwordabc` <br> Mật khẩu mạnh hợp lệ: `StrongP@ssw0rd!123` |
+| Expected Output | - Các trường hợp mật khẩu yếu bị từ chối đăng ký và trả về HTTP 400 Bad Request hoặc 422 Unprocessable Entity kèm mô tả lỗi cụ thể. <br> - Mật khẩu mạnh hợp lệ đăng ký thành công trả về HTTP 201 Created. |
+| Test steps | 1. Gửi request `POST /api/v1/auth/register` với các mật khẩu yếu tương ứng -> Xác nhận hệ thống trả về lỗi HTTP 400 hoặc 422. <br> 2. Gửi request `POST /api/v1/auth/register` với mật khẩu mạnh hợp lệ -> Xác nhận status = 201. |
+| Actual Output | Thử đăng ký với mật khẩu ngắn, không viết hoa, không ký tự đặc biệt đều bị trả về lỗi HTTP 400/422. Mật khẩu mạnh hợp lệ đăng ký thành công (201). |
+| Result | Passed |
+
+#### 3.2.32. TC-032: Registration duplicate email/username check
+
+    Written by: 23120123 Trần Gia Hiển
+    Reviewed by: 23120182 Nguyễn Duy Trường
+
+| *Test case* | TC-032 |
+| :--- | :--- |
+| Related feature | U001 — Đăng ký tài khoản |
+| Context | Kiểm tra ràng buộc duy nhất đối với các thông tin tài khoản quan trọng (Email và Username) khi có người đăng ký mới |
+| Input Data | - Tài khoản đã tồn tại trong hệ thống: username `existuser`, email `existing@yag.dev` <br> - Đăng ký trùng email: `{ "username": "newuser", "email": "existing@yag.dev", "password": "P@ssw0rd!123" }` <br> - Đăng ký trùng username: `{ "username": "existuser", "email": "new@yag.dev", "password": "P@ssw0rd!123" }` |
+| Expected Output | Hệ thống từ chối đăng ký trùng lặp và trả về mã lỗi HTTP 400 Bad Request kèm thông báo email hoặc username đã tồn tại |
+| Test steps | 1. Đảm bảo tài khoản `existuser` và email `existing@yag.dev` đã có trong CSDL. <br> 2. Gửi request đăng ký trùng email -> Xác nhận status = 400 và nội dung lỗi chỉ ra trùng email. <br> 3. Gửi request đăng ký trùng username -> Xác nhận status = 400 và nội dung lỗi chỉ ra trùng username. |
+| Actual Output | Request đăng ký trùng email và trùng username hiện tại đều bị CSDL/API chặn lại và phản hồi mã lỗi HTTP 400 Bad Request. |
+| Result | Passed |
+
+#### 3.2.33. TC-033: JWT token refresh flow
+
+    Written by: 23120123 Trần Gia Hiển
+    Reviewed by: 23120182 Nguyễn Duy Trường
+
+| *Test case* | TC-033 |
+| :--- | :--- |
+| Related feature | U001 — Quản lý phiên đăng nhập |
+| Context | Cơ chế tự động làm mới mã Access Token bằng mã Refresh Token hợp lệ giúp người dùng duy trì trạng thái đăng nhập mà không cần nhập mật khẩu liên tục |
+| Input Data | - Endpoint: `POST /api/v1/auth/refresh` <br> - Mã Refresh Token hợp lệ (đã được cấp khi đăng nhập thành công) <br> - Mã Refresh Token giả lập hoặc hết hạn |
+| Expected Output | - Refresh Token hợp lệ: Hệ thống trả về HTTP 200, chứa Access Token mới. <br> - Refresh Token không hợp lệ hoặc hết hạn: Trả về HTTP 401 Unauthorized. |
+| Test steps | 1. Thực hiện gọi `POST /api/v1/auth/login` với tài khoản hợp lệ -> Lưu lại `refresh_token`. <br> 2. Gửi request `POST /api/v1/auth/refresh` với `refresh_token` hợp lệ trên -> Xác nhận status = 200, nhận Access Token mới. <br> 3. Thử gọi API bảo vệ bằng Access Token mới nhận được -> Xác nhận status = 200. <br> 4. Gửi request `POST /api/v1/auth/refresh` with Refresh Token sai cấu trúc hoặc hết hạn -> Xác nhận status = 401. |
+| Actual Output | Gửi refresh_token hợp lệ nhận về access_token mới (HTTP 200) và dùng access_token mới gọi protected API thành công. Gửi refresh_token sai bị chặn trả về 401. |
+| Result | Passed |
 
 ## 4. AI Usage Declaration
 
